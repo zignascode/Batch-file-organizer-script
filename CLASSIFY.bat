@@ -5,7 +5,8 @@ chcp 65001 >nul
 
 ECHO. & ECHO	_______________________________________________
 ECHO	_______________________________________________
-ECHO		FILES CLASSIFIER BY YEAR V.28/01/26
+ECHO		FILES CLASSIFIER BY YEAR V.1.0 25/03/2026
+ECHO		Author: B.M.F. (https://github.com/zignascode)
 ECHO	_______________________________________________
 ECHO	_______________________________________________ & ECHO.
 
@@ -64,10 +65,11 @@ set "reset=0" ::Controla la periodicidad del cálculo de estimaciones.
 
 ::Recorre todos los archivos contenidos en la carpeta actual.
 for %%i in (*.*) do (
-	::Obitiene el time inicial para estimación.
+	::Obtiene el time inicial para estimación.
 	if !reset! EQU 0 (
 		for /f "tokens=1-4 delims=:." %%a in ("!time!") do (
 		::Del comando time extrae los centisegundos totales.
+		::Se usa 1%%-100 para evitar problemas con el formato de hora de un solo dígito.
 		set /a "to = ((1%%a-100)*360000)+((1%%b-100)*6000)+((1%%c-100)*100)+1%%d-100"
 		)
 	)
@@ -80,6 +82,7 @@ for %%i in (*.*) do (
 		set "fm=!year!!month!!day!"
 
 		::Obtiene el hashfile único del archivo del comando certutil.
+		::El comando certutil devuelve varias líneas, se salta la primera y se guarda la segunda.
 		set x=1
 		for /F "skip=1" %%h in ('certutil -hashfile "%%i" MD5') do (
 			if !x! EQU 1 (set "hash=%%h" & set x=0)
@@ -93,11 +96,10 @@ for %%i in (*.*) do (
 		::Verifica que no exista el archivo nuevo y lo mueve a la carpeta de su año.
 		if not exist !dest! (
 			move "%%i" !dest! >nul 2>&1 || (
-				::Crea la carpeta si aún no está definida.
+				::Estas líneas se ejecutan si falla el movimiento.
 				mkdir "%fres%/!year!" 2>nul
 				move "%%i" !dest! >nul 2>&1 || (
-					::Si hay un archivo con problemas, lo deja intacto en los resultados.
-					setlocal DisableDelayedExpansion
+					::Esta línea se ejecuta si falla el comando por caracteres especiales.
 					move "%%i" >nul 2>&1 %fres% & endlocal
 				)
 			)
@@ -132,17 +134,22 @@ exit /b
 
 REM SUBRUTINA 1 EXTERNA PARA TRABAJAR LAS COPIAS SIN ROMPER EL CICLO PRINCIPAL
 ::###########################################################################################
-:COPIADO ::Toma los parámetros del call de la línea 108
+:COPIADO
+::Toma los parámetros del archivo original y el nombre nuevo para las copias (línea 108).
 set "file=%~1" & set "cfile=%~2"
 set "cn=C1" & set "n=1" ::Prefijos de archivos duplicados
 
-:RECOUNT ::Inicia la verificación de copias en la carpeta con prefijos acumulados
+:RECOUNT
+::Si el nombre nuevo ya existe, suma 1 al contador y cambia el prefijo.
 set "nfile=!cn!_!cfile!"
 if not exist copies/!nfile! (
+	::Si la copia no existe, se mueve el archivo a la carpeta de copias con el nuevo nombre.
 	move "!file!" copies/!nfile! >nul 2>&1 || (
+		::Si la carpeta de copias no existe, se crea y se mueve el archivo.
 		mkdir copies & move "!file!" copies/!nfile! >nul 2>&1
 	)
 ) else (
+	::Si la copia ya existe, se repite el proceso hasta encontrar un nombre disponible.
 	set /a "n=!n!+1" & set "cn=C!n!"
 	GOTO RECOUNT
 )
